@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>ChatGPT Ad Maker</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background-color: #f2f2f2;
+      margin: 0;
+      padding: 20px;
+    }
+    #canvas {
+      border: 1px solid #ccc;
+      background-color: white;
+    }
+    .controls {
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>ChatGPT Ad Maker</h1>
+  <!-- 上傳影片 -->
+  <input type="file" id="video-upload" accept="video/*">
+  <br><br>
+  <!-- 隱藏影片元件（僅用於擷取影格） -->
+  <video id="video" style="display:none;"></video>
+  <!-- 畫面輸出 -->
+  <canvas id="canvas"></canvas>
+  <div class="controls">
+    <label for="dotSize">調整網格大小 / 最大點直徑：</label>
+    <input type="range" id="dotSize" min="5" max="50" value="20">
+    <br><br>
+    <button id="replay">重播影片</button>
+  </div>
+
+  <script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const dotSizeSlider = document.getElementById('dotSize');
+    const replayButton = document.getElementById('replay');
+    let animationFrameId;
+
+    // 當使用者選取影片時
+    document.getElementById('video-upload').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (file) {
+        const fileURL = URL.createObjectURL(file);
+        video.src = fileURL;
+        video.load();
+        // 等待影片資訊載入後設定 Canvas 尺寸並開始播放
+        video.onloadedmetadata = function() {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          video.play();
+          processVideo();
+        };
+      }
+    });
+
+    // 利用 requestAnimationFrame 處理影片的每一幀
+    function processVideo() {
+      if (video.paused || video.ended) return;
+
+      // 先把當前影格畫到 Canvas 上
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      // 擷取影格資料
+      const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      // 根據滑桿調整網格大小
+      const gridSize = parseInt(dotSizeSlider.value);
+      
+      // 以網格方式掃描影格
+      for (let y = 0; y < canvas.height; y += gridSize) {
+        for (let x = 0; x < canvas.width; x += gridSize) {
+          // 取得該點的像素資料
+          const index = ((Math.floor(y) * canvas.width) + Math.floor(x)) * 4;
+          const r = frame.data[index];
+          const g = frame.data[index + 1];
+          const b = frame.data[index + 2];
+          // 計算灰階亮度
+          const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
+          // 計算半色調點的半徑（亮度越高，點越小）
+          const radius = gridSize * (1 - brightness / 255);
+          
+          // 畫出黑色的圓點（背景預設為白色）
+          ctx.beginPath();
+          ctx.arc(x, y, radius / 2, 0, Math.PI * 2);
+          ctx.fillStyle = "black";
+          ctx.fill();
+        }
+      }
+      
+      // 繼續處理下一幀
+      animationFrameId = requestAnimationFrame(processVideo);
+    }
+
+    // 重播按鈕事件：將影片時間重設並播放
+    replayButton.addEventListener('click', function() {
+      video.currentTime = 0;
+      video.play();
+      // 若之前已停止處理，重新啟動動畫
+      processVideo();
+    });
+  </script>
+</body>
+</html>
